@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 import { request } from '@/api/client'
 
@@ -16,37 +16,34 @@ const columns = [
 const actions = [
   "提交校验",
   "启用配置",
-  "停用配置"
-]
-const statuses = [
-  "草稿",
-  "待校验",
-  "已启用",
-  "已停用"
-]
-const stats = [
-  {
-    "label": "分析数据集总数",
-    "value": 0
-  },
-  {
-    "label": "待校验数据集",
-    "value": 0
-  },
-  {
-    "label": "已启用数据集",
-    "value": 0
-  }
+  "停用配置",
+  "刷新数据集"
 ]
 
-type Row = Record<string, string | number | null>
+type Row = {
+  id: number
+  status?: string
+  数据集编号: string
+  数据集名称: string
+  来源表名: string
+  字段列表: string
+  行数上限: string
+  刷新频率: string
+  最近刷新: string
+  是否启用: string
+  最近刷新代次: number
+  最近刷新时间: string
+  被实验引用: string[]
+  引用实验: { 实验编号: string; 实验名称: string; 实验状态: string }[]
+}
 
 export default function DatasetView() {
   const [rows, setRows] = useState<Row[]>([])
   const [total, setTotal] = useState(0)
   const [errorMessage, setErrorMessage] = useState('')
+  const [message, setMessage] = useState('')
   const [filters, setFilters] = useState<Record<string, string>>({})
-  const filterFields = useMemo(() => columns.slice(0, 3), [])
+  const filterFields = ["数据集编号", "来源表名"]
 
   const reload = useCallback(async () => {
     setErrorMessage('')
@@ -70,39 +67,52 @@ export default function DatasetView() {
 
   async function runAction(action: string, row: Row) {
     setErrorMessage('')
+    setMessage('')
     try {
       const response = await request(`${ENDPOINT}/${row.id}/actions`, {
         method: 'POST',
-        body: JSON.stringify({ action }),
+        body: JSON.stringify({ values: { action } }),
       })
       if (!response.ok) {
         throw new Error('分析数据集动作未生效，请稍后重试')
       }
+      const payload = await response.json()
+      setMessage(payload.message ?? '')
       await reload()
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : '分析数据集操作失败')
     }
   }
 
+  const referenced = rows.filter((row) => (row.被实验引用 ?? []).length > 0).length
+
   return (
     <section className="page" data-module="dataset">
       <header className="page-head">
         <div>
           <h2>分析数据集管理</h2>
-          <p className="page-desc">维护分析可用的数据集定义、字段范围与刷新策略，支撑多维度分析。</p>
+          <p className="page-desc">
+            维护分析可用的数据集定义、字段范围与刷新策略；清单按数据集最近刷新代次展示，
+            并标出被哪些分析实验引用，与实验复核页使用的新代次保持一致。
+          </p>
         </div>
         <div className="page-actions">
-          <button className="btn primary" type="button" onClick={() => setErrorMessage('数据集登记入口尚未接入审批流')}>
-            登记数据集
-          </button>
           <button className="btn" type="button" onClick={() => window.open(`${ENDPOINT}/export`, '_blank')}>
             导出分析数据集清单
           </button>
         </div>
       </header>
 
+      {errorMessage && <p className="error-text">{errorMessage}</p>}
+      {message && <p className="ok-text">{message}</p>}
+
       <div className="stat-row">
-        {stats.map((item) => (
+        {[
+          { label: '分析数据集总数', value: total },
+          { label: '被实验引用', value: referenced },
+          { label: '待校验数据集', value: rows.filter((row) => row.status === '待校验').length },
+          { label: '已启用数据集', value: rows.filter((row) => row.status === '已启用').length },
+        ].map((item) => (
           <article key={item.label} className="stat-card">
             <span className="stat-label">{item.label}</span>
             <strong className="stat-value">{item.value}</strong>
@@ -129,13 +139,29 @@ export default function DatasetView() {
         <thead>
           <tr>
             {columns.map((column) => <th key={column}>{column}</th>)}
+            <th>最近刷新代次</th>
+            <th>最近刷新时间</th>
+            <th>被实验引用</th>
             <th>可执行动作</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((row) => (
             <tr key={String(row.id)}>
-              {columns.map((column) => <td key={column}>{row[column] ?? '—'}</td>)}
+              {columns.map((column) => <td key={column}>{String(row[column as keyof Row] ?? '—')}</td>)}
+              <td>
+                <span className="badge">代次 {row.最近刷新代次}</span>
+              </td>
+              <td>{row.最近刷新时间}</td>
+              <td>
+                {(row.引用实验 ?? []).length === 0 && '—'}
+                {(row.引用实验 ?? []).map((experiment) => (
+                  <div key={experiment.实验编号}>
+                    <span className="badge">{experiment.实验编号}</span>
+                    <span className="review-meta">{experiment.实验名称}</span>
+                  </div>
+                ))}
+              </td>
               <td className="row-actions">
                 {actions.map((action) => (
                   <button key={action} className="link" type="button" onClick={() => void runAction(action, row)}>
@@ -147,7 +173,7 @@ export default function DatasetView() {
           ))}
           {rows.length === 0 && (
             <tr>
-              <td className="empty-state" colSpan={columns.length + 1}>暂无分析数据集数据，可先登记数据集</td>
+              <td className="empty-state" colSpan={columns.length + 4}>暂无分析数据集数据，可先登记数据集</td>
             </tr>
           )}
         </tbody>

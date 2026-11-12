@@ -73,7 +73,7 @@ export default function ServiceView() {
     try {
       const response = await request(`${ENDPOINT}/${row.id}/actions`, {
         method: 'POST',
-        body: JSON.stringify({ action }),
+        body: JSON.stringify({ values: { action } }),
       })
       if (!response.ok) {
         throw new Error('数据服务发布动作未生效，请稍后重试')
@@ -129,6 +129,8 @@ export default function ServiceView() {
         <thead>
           <tr>
             {columns.map((column) => <th key={column}>{column}</th>)}
+            <th>数据集代次</th>
+            <th>引用实验</th>
             <th>可执行动作</th>
           </tr>
         </thead>
@@ -136,6 +138,8 @@ export default function ServiceView() {
           {rows.map((row) => (
             <tr key={String(row.id)}>
               {columns.map((column) => <td key={column}>{row[column] ?? '—'}</td>)}
+              <td><span className="badge">代次 {String(row['数据集代次'] ?? 0)}</span></td>
+              <td>{Array.isArray(row['引用实验']) && (row['引用实验'] as string[]).length > 0 ? (row['引用实验'] as string[]).join('、') : '—'}</td>
               <td className="row-actions">
                 {actions.map((action) => (
                   <button key={action} className="link" type="button" onClick={() => void runAction(action, row)}>
@@ -147,7 +151,7 @@ export default function ServiceView() {
           ))}
           {rows.length === 0 && (
             <tr>
-              <td className="empty-state" colSpan={columns.length + 1}>暂无数据服务发布数据，可先登记数据服务</td>
+              <td className="empty-state" colSpan={columns.length + 3}>暂无数据服务发布数据，可先登记数据服务</td>
             </tr>
           )}
         </tbody>

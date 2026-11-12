@@ -26,14 +26,21 @@ def list_entries(
     """按报告编号与状态过滤分析报告管理列表；没有数据时返回空页，不报错。"""
     if size > 200:
         raise HTTPException(status_code=400, detail="每页最多 200 条，请缩小分页范围")
-    items, total = service.list_entries(keyword=keyword, status=status, page=page, size=size)
+    items, total = service.list_decorated(keyword=keyword, status=status, page=page, size=size)
     return PageResult(items=items, total=total, page=page, size=size)
+
+
+@router.get("/export")
+def export_entries() -> dict[str, Any]:
+    """导出分析报告管理清单：返回当前过滤条件下的全量数据。"""
+    items, total = service.list_decorated(page=1, size=10000)
+    return {"module": "report", "total": total, "items": items}
 
 
 @router.get("/{entry_id}", response_model=dict)
 def get_entry(entry_id: int) -> dict:
     """读取单条分析报告明细；不存在时给出可读的错误说明。"""
-    entry = service.get_entry(entry_id)
+    entry = service.get_decorated(entry_id)
     if entry is None:
         raise HTTPException(status_code=404, detail=f"分析报告 {entry_id} 不存在或已归档")
     return entry
@@ -58,8 +65,3 @@ def run_action(entry_id: int, payload: EntryPayload) -> ActionResult:
     return ActionResult(ok=True, message=message, entry=entry)
 
 
-@router.get("/export")
-def export_entries() -> dict[str, Any]:
-    """导出分析报告管理清单：返回当前过滤条件下的全量数据。"""
-    items, total = service.list_entries(page=1, size=10000)
-    return {"module": "report", "total": total, "items": items}

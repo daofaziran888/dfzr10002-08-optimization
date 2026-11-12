@@ -14,9 +14,26 @@ class Store:
         self._tables: dict[str, list[dict[str, Any]]] = {
             name: [dict(row) for row in rows] for name, rows in SEED_ROWS.items()
         }
+        # 数据集刷新代次是附属数据，不作为一个业务模块出现在概览里。
+        self._aux: dict[str, list[dict[str, Any]]] = {
+            "dataset_generation": [
+                {"数据集编号": "DATA-0001", "代次": 1, "最近刷新": "2026-10-20 02:10"},
+                {"数据集编号": "DATA-0001", "代次": 2, "最近刷新": "2026-11-10 02:12"},
+                {"数据集编号": "DATA-0002", "代次": 1, "最近刷新": "2026-10-25 09:00"},
+                {"数据集编号": "DATA-0002", "代次": 2, "最近刷新": "2026-11-11 09:00"},
+                {"数据集编号": "DATA-0003", "代次": 1, "最近刷新": "2026-11-08 03:02"},
+                {"数据集编号": "DATA-0003", "代次": 2, "最近刷新": "2026-11-10 03:04"},
+                {"数据集编号": "DATA-0003", "代次": 3, "最近刷新": "2026-11-12 03:05"},
+            ],
+            "review": [],
+        }
 
     def module_names(self) -> list[str]:
         return sorted(self._tables)
+
+    def aux_rows(self, name: str) -> list[dict[str, Any]]:
+        """附属数据（数据集代次、复核结论），不参与业务模块统计。"""
+        return self._aux.setdefault(name, [])
 
     def rows(self, module: str) -> list[dict[str, Any]]:
         return self._tables.setdefault(module, [])

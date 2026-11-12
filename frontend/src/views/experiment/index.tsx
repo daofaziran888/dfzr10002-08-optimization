@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 
 import { request } from '@/api/client'
 
@@ -24,20 +25,6 @@ const statuses = [
   "已完成",
   "已关闭"
 ]
-const stats = [
-  {
-    "label": "分析实验总数",
-    "value": 0
-  },
-  {
-    "label": "运行中实验",
-    "value": 0
-  },
-  {
-    "label": "已完成实验",
-    "value": 0
-  }
-]
 
 type Row = Record<string, string | number | null>
 
@@ -46,7 +33,7 @@ export default function ExperimentView() {
   const [total, setTotal] = useState(0)
   const [errorMessage, setErrorMessage] = useState('')
   const [filters, setFilters] = useState<Record<string, string>>({})
-  const filterFields = useMemo(() => columns.slice(0, 3), [])
+  const filterFields = ["实验编号", "实验名称"]
 
   const reload = useCallback(async () => {
     setErrorMessage('')
@@ -73,7 +60,7 @@ export default function ExperimentView() {
     try {
       const response = await request(`${ENDPOINT}/${row.id}/actions`, {
         method: 'POST',
-        body: JSON.stringify({ action }),
+        body: JSON.stringify({ values: { action } }),
       })
       if (!response.ok) {
         throw new Error('分析实验管理动作未生效，请稍后重试')
@@ -84,17 +71,18 @@ export default function ExperimentView() {
     }
   }
 
+  const running = rows.filter((row) => row.实验状态 === '运行中' || row.status === '运行中').length
+  const finished = rows.filter((row) => row.实验状态 === '已完成' || row.status === '已完成').length
+
   return (
     <section className="page" data-module="experiment">
       <header className="page-head">
         <div>
-          <h2>分析实验管理管理</h2>
+          <h2>分析实验管理</h2>
           <p className="page-desc">维护分析实验的设计参数、分组方案与统计显著性校验，支持A/B实验分析。</p>
         </div>
         <div className="page-actions">
-          <button className="btn primary" type="button" onClick={() => setErrorMessage('分析实验登记入口尚未接入审批流')}>
-            登记分析实验
-          </button>
+          <Link className="btn primary" to="/experiment-review">进入实验复核</Link>
           <button className="btn" type="button" onClick={() => window.open(`${ENDPOINT}/export`, '_blank')}>
             导出分析实验管理清单
           </button>
@@ -102,7 +90,11 @@ export default function ExperimentView() {
       </header>
 
       <div className="stat-row">
-        {stats.map((item) => (
+        {[
+          { label: '分析实验总数', value: total },
+          { label: '运行中实验', value: running },
+          { label: '已完成实验', value: finished },
+        ].map((item) => (
           <article key={item.label} className="stat-card">
             <span className="stat-label">{item.label}</span>
             <strong className="stat-value">{item.value}</strong>
@@ -129,6 +121,7 @@ export default function ExperimentView() {
         <thead>
           <tr>
             {columns.map((column) => <th key={column}>{column}</th>)}
+            <th>复核</th>
             <th>可执行动作</th>
           </tr>
         </thead>
@@ -136,6 +129,7 @@ export default function ExperimentView() {
           {rows.map((row) => (
             <tr key={String(row.id)}>
               {columns.map((column) => <td key={column}>{row[column] ?? '—'}</td>)}
+              <td><Link className="link" to="/experiment-review">查看复核</Link></td>
               <td className="row-actions">
                 {actions.map((action) => (
                   <button key={action} className="link" type="button" onClick={() => void runAction(action, row)}>
@@ -147,7 +141,7 @@ export default function ExperimentView() {
           ))}
           {rows.length === 0 && (
             <tr>
-              <td className="empty-state" colSpan={columns.length + 1}>暂无分析实验管理数据，可先登记分析实验</td>
+              <td className="empty-state" colSpan={columns.length + 2}>暂无分析实验管理数据，可先登记分析实验</td>
             </tr>
           )}
         </tbody>
@@ -160,3 +154,4 @@ export default function ExperimentView() {
     </section>
   )
 }
+
